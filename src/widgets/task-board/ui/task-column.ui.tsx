@@ -23,6 +23,10 @@ export function TaskColumn({
 
   const filteredTasks = tasks.filter((task) => task.status === status);
 
+  // ---------------------------------------------------------------------------
+  // Hooks
+  // ---------------------------------------------------------------------------
+
   const { setNodeRef } = useDroppable({
     id: status,
     data: {
@@ -30,6 +34,8 @@ export function TaskColumn({
       type: "column",
     },
   });
+
+  if (filteredTasks.length === 0) return;
 
   // ---------------------------------------------------------------------------
   return (
