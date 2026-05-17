@@ -1,47 +1,36 @@
+import { apiClient } from "@/shared/api/client";
+import { API_ENDPOINTS } from "@/shared/api/endpoints";
+
 import {
   createLocalTask,
-  normalizeDummyJsonTask,
   normalizeJsonPlaceholderTask,
 } from "../lib/normalize-task";
-import type {
-  DummyJsonResponse,
-  JsonPlaceholderTodo,
-  Task,
-  TaskDraft,
-} from "../model/types";
 
-const dummyJsonUrl = "https://dummyjson.com/todos";
-const jsonPlaceholderUrl = "https://jsonplaceholder.typicode.com/todos";
+import type { JsonPlaceholderTodo, Task, TaskDraft } from "../model/types";
 
 export async function fetchTasks(): Promise<Task[]> {
-  const [dummyResponse, placeholderResponse] = await Promise.all([
-    fetch(dummyJsonUrl),
-    fetch(jsonPlaceholderUrl),
-  ]);
+  try {
+    const data = await apiClient<JsonPlaceholderTodo[]>(API_ENDPOINTS.todos);
 
-  if (!dummyResponse.ok || !placeholderResponse.ok) {
-    throw new Error("Failed to load tasks from public APIs.");
+    return data.map(normalizeJsonPlaceholderTask);
+  } catch (error) {
+    console.error(error);
+
+    throw new Error("Failed to fetch tasks");
   }
-
-  const dummyData = (await dummyResponse.json()) as DummyJsonResponse;
-  const placeholderData =
-    (await placeholderResponse.json()) as JsonPlaceholderTodo[];
-
-  return [
-    ...dummyData.todos.map(normalizeDummyJsonTask),
-    ...placeholderData.slice(0, 60).map(normalizeJsonPlaceholderTask),
-  ];
 }
 
 export async function createTask(draft: TaskDraft): Promise<Task> {
-  await fetch(`${dummyJsonUrl}/add`, {
+  await apiClient(API_ENDPOINTS.todos, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
       completed: draft.status === "done",
-      todo: draft.title,
+      title: draft.title,
       userId: 1,
     }),
-    headers: { "Content-Type": "application/json" },
-    method: "POST",
   });
 
   return createLocalTask(draft);
@@ -50,14 +39,15 @@ export async function createTask(draft: TaskDraft): Promise<Task> {
 export async function updateTask(task: Task): Promise<Task> {
   if (task.source === "local") return task;
 
-  await fetch(getMutationUrl(task), {
+  await apiClient(`${API_ENDPOINTS.todos}/${task.apiId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
       completed: task.status === "done",
       title: task.title,
-      todo: task.title,
     }),
-    headers: { "Content-Type": "application/json" },
-    method: "PUT",
   });
 
   return task;
@@ -66,15 +56,7 @@ export async function updateTask(task: Task): Promise<Task> {
 export async function deleteTask(task: Task): Promise<void> {
   if (task.source === "local") return;
 
-  await fetch(getMutationUrl(task), {
+  await apiClient(`${API_ENDPOINTS.todos}/${task.apiId}`, {
     method: "DELETE",
   });
-}
-
-function getMutationUrl(task: Task): string {
-  if (task.source === "jsonplaceholder") {
-    return `${jsonPlaceholderUrl}/${task.apiId}`;
-  }
-
-  return `${dummyJsonUrl}/${task.apiId}`;
 }

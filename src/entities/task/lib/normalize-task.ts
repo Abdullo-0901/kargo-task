@@ -1,22 +1,11 @@
 import { taskPriorities, taskStatuses } from "../model/constants";
 import type {
-  DummyJsonTodo,
   JsonPlaceholderTodo,
   Task,
   TaskDraft,
   TaskSource,
   TaskStatus,
 } from "../model/types";
-
-export function normalizeDummyJsonTask(todo: DummyJsonTodo): Task {
-  return buildApiTask({
-    apiId: todo.id,
-    completed: todo.completed,
-    source: "dummyjson",
-    title: todo.todo,
-    userId: todo.userId,
-  });
-}
 
 export function normalizeJsonPlaceholderTask(todo: JsonPlaceholderTodo): Task {
   return buildApiTask({

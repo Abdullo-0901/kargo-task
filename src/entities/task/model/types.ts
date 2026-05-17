@@ -2,7 +2,7 @@ export type TaskStatus = "todo" | "in-progress" | "review" | "done";
 
 export type TaskPriority = "low" | "medium" | "high";
 
-export type TaskSource = "dummyjson" | "jsonplaceholder" | "local";
+export type TaskSource = "jsonplaceholder" | "local";
 
 export type Task = {
   id: string;
@@ -27,17 +27,6 @@ export type TaskFilters = {
   search: string;
   status: "all" | TaskStatus;
   priority: "all" | TaskPriority;
-};
-
-export type DummyJsonTodo = {
-  id: number;
-  todo: string;
-  completed: boolean;
-  userId: number;
-};
-
-export type DummyJsonResponse = {
-  todos: DummyJsonTodo[];
 };
 
 export type JsonPlaceholderTodo = {
