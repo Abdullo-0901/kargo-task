@@ -15,13 +15,25 @@ import {
 
 import { fetchTasks, updateTask } from "@/entities/task/api/task-api";
 
-import type { Task, TaskStatus } from "@/entities";
+import {
+  statusLabels,
+  taskStatuses,
+  type Task,
+  type TaskStatus,
+} from "@/entities";
 
 import { CreateTaskModal } from "@/features/task/create-task/ui/create-task-modal";
 
 import { TaskCard } from "./task-card.ui";
 import { TaskColumn } from "./task-column.ui";
 import { TaskColumnSkeleton } from "@/entities/task/ui/task-column-skeleton.ui";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/ui";
 
 const columns: {
   title: string;
@@ -51,6 +63,9 @@ export function TaskBoard() {
   // ---------------------------------------------------------------------------
 
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<TaskStatus | "all">(
+    "all",
+  );
 
   const queryClient = useQueryClient();
 
@@ -88,7 +103,11 @@ export function TaskBoard() {
     },
   });
 
-  const tasks = data?.pages.flatMap((page) => page) ?? [];
+  const allTasks = data?.pages.flatMap((page) => page) ?? [];
+  const tasks =
+    selectedStatus === "all"
+      ? allTasks
+      : allTasks.filter((task) => task.status === selectedStatus);
 
   // ---------------------------------------------------------------------------
   // Infinite scroll
@@ -289,7 +308,29 @@ export function TaskBoard() {
               </p>
             </div>
 
-            <CreateTaskModal />
+            <div className="flex items-center gap-3">
+              <Select
+                value={selectedStatus}
+                onValueChange={(value) =>
+                  setSelectedStatus(value as TaskStatus | "all")
+                }
+              >
+                <SelectTrigger className="w-[180px] border-zinc-800 bg-zinc-900 text-white">
+                  <SelectValue placeholder="Filter status" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <SelectItem value="all">All Tasks</SelectItem>
+                  {taskStatuses.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {statusLabels[status]}{" "}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <CreateTaskModal />
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
