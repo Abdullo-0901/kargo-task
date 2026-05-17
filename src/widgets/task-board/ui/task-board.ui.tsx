@@ -17,6 +17,7 @@ import { Button } from "@/shared/ui/button";
 
 import { TaskCard } from "./task-card.ui";
 import { TaskColumn } from "./task-column.ui";
+import { CreateTaskModal } from "@/features/task/create-task/ui/create-task-modal";
 
 const columns: {
   title: string;
@@ -159,7 +160,7 @@ export function TaskBoard() {
               </p>
             </div>
 
-            <Button>Create Task</Button>
+            <CreateTaskModal />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
