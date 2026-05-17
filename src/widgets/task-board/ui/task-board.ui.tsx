@@ -38,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui";
+import { EditTaskModal } from "@/features/task/edit-task/ui/edit.task-modal";
 
 const columns: {
   title: string;
@@ -352,7 +353,7 @@ export function TaskBoard() {
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <main className="min-h-screen bg-zinc-950 p-6 text-white">
         <div className="mx-auto max-w-7xl">
-          <div className="mb-8 flex items-center justify-between">
+          <div className="mb-8 flex items-center justify-between flex-col sm:flex-row">
             <div>
               <h1 className="text-3xl font-bold">Task Board</h1>
 
@@ -423,6 +424,16 @@ export function TaskBoard() {
           </div>
         </div>
       </main>
+
+      <EditTaskModal
+        open={!!editingTask}
+        task={editingTask}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingTask(null);
+          }
+        }}
+      />
 
       <DragOverlay>
         {activeTask ? (

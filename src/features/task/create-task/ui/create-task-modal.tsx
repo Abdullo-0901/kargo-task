@@ -64,14 +64,32 @@ export function CreateTaskModal() {
         queryKey: ["tasks"],
       });
 
-      const previousTasks = queryClient.getQueryData<Task[]>(["tasks"]);
+      const previousTasks = queryClient.getQueryData(["tasks"]);
 
       const optimisticTask = createLocalTask(draftTask);
 
-      queryClient.setQueryData<Task[]>(["tasks"], (old = []) => [
-        ...old,
-        optimisticTask,
-      ]);
+      queryClient.setQueriesData(
+        {
+          queryKey: ["tasks"],
+        },
+        (oldData: any) => {
+          if (!oldData?.pages) {
+            return oldData;
+          }
+
+          return {
+            ...oldData,
+
+            pages: oldData.pages.map((page: Task[], index: number) => {
+              if (index === 0) {
+                return [optimisticTask, ...page];
+              }
+
+              return page;
+            }),
+          };
+        },
+      );
 
       return {
         previousTasks,
