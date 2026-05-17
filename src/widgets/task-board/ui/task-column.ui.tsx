@@ -8,10 +8,14 @@ export function TaskColumn({
   tasks,
   title,
   status,
+  onDelete,
+  onEdit,
 }: {
   tasks: Task[];
   title: string;
   status: TaskStatus;
+  onEdit(task: Task): void;
+  onDelete: (task: Task) => void;
 }) {
   // ---------------------------------------------------------------------------
   // Variables
@@ -41,7 +45,12 @@ export function TaskColumn({
 
       <div className="min-h-[200px] space-y-3">
         {filteredTasks.map((task) => (
-          <TaskCard key={task.id} task={task} />
+          <TaskCard
+            key={task.id}
+            task={task}
+            onDelete={onDelete}
+            onEdit={onEdit}
+          />
         ))}
       </div>
     </div>

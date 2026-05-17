@@ -13,7 +13,11 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
-import { fetchTasks, updateTask } from "@/entities/task/api/task-api";
+import {
+  deleteTask,
+  fetchTasks,
+  updateTask,
+} from "@/entities/task/api/task-api";
 
 import {
   statusLabels,
@@ -63,6 +67,8 @@ export function TaskBoard() {
   // ---------------------------------------------------------------------------
 
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
   const [selectedStatus, setSelectedStatus] = useState<TaskStatus | "all">(
     "all",
   );
@@ -189,6 +195,45 @@ export function TaskBoard() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: deleteTask,
+
+    onMutate: async (task: Task) => {
+      await queryClient.cancelQueries({
+        queryKey: ["tasks"],
+      });
+
+      const previousData = queryClient.getQueryData(["tasks"]);
+
+      queryClient.setQueriesData(
+        {
+          queryKey: ["tasks"],
+        },
+        (oldData: any) => {
+          if (!oldData?.pages) {
+            return oldData;
+          }
+
+          return {
+            ...oldData,
+
+            pages: oldData.pages.map((page: Task[]) =>
+              page.filter((item) => item.id !== task.id),
+            ),
+          };
+        },
+      );
+
+      return {
+        previousData,
+      };
+    },
+
+    onError: (_error, _variables, context) => {
+      queryClient.setQueryData(["tasks"], context?.previousData);
+    },
+  });
+
   // ---------------------------------------------------------------------------
   // Drag handlers
   // ---------------------------------------------------------------------------
@@ -228,6 +273,14 @@ export function TaskBoard() {
       ...activeTask,
       status: newStatus,
     });
+  }
+
+  function handleEdit(task: Task) {
+    setEditingTask(task);
+  }
+
+  function handleDelete(task: Task) {
+    deleteMutation.mutate(task);
   }
 
   // ---------------------------------------------------------------------------
@@ -340,6 +393,8 @@ export function TaskBoard() {
                 tasks={tasks}
                 title={column.title}
                 status={column.status}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
               />
             ))}
           </div>
@@ -372,7 +427,11 @@ export function TaskBoard() {
       <DragOverlay>
         {activeTask ? (
           <div className="rotate-2 opacity-90">
-            <TaskCard task={activeTask} />
+            <TaskCard
+              task={activeTask}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
           </div>
         ) : null}
       </DragOverlay>
