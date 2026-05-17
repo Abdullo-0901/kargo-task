@@ -1,5 +1,7 @@
+import { TaskBoardPage } from "@/pages/task-board/task-board-page";
+
 function App() {
-  return <h1 className="text-3xl font-bold underline">Hello world!</h1>;
+  return <TaskBoardPage />;
 }
 
 export default App;
