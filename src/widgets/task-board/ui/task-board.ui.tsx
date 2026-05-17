@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   DndContext,
@@ -7,17 +7,21 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import { fetchTasks, updateTask } from "@/entities/task/api/task-api";
 
 import type { Task, TaskStatus } from "@/entities";
 
-import { Button } from "@/shared/ui/button";
+import { CreateTaskModal } from "@/features/task/create-task/ui/create-task-modal";
 
 import { TaskCard } from "./task-card.ui";
 import { TaskColumn } from "./task-column.ui";
-import { CreateTaskModal } from "@/features/task/create-task/ui/create-task-modal";
+import { TaskColumnSkeleton } from "@/entities/task/ui/task-column-skeleton.ui";
 
 const columns: {
   title: string;
@@ -45,55 +49,134 @@ export function TaskBoard() {
   // ---------------------------------------------------------------------------
   // Variables
   // ---------------------------------------------------------------------------
+
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+
   const queryClient = useQueryClient();
+
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   // ---------------------------------------------------------------------------
   // Fetch data
   // ---------------------------------------------------------------------------
 
   const {
-    data = [],
+    data,
     isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
     isError,
-  } = useQuery({
+    error,
+  } = useInfiniteQuery({
     queryKey: ["tasks"],
-    queryFn: fetchTasks,
+
+    initialPageParam: 1,
+
+    queryFn: ({ pageParam }) =>
+      fetchTasks({
+        pageParam,
+        limit: 20,
+      }),
+
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.length < 20) {
+        return undefined;
+      }
+
+      return allPages.length + 1;
+    },
   });
+
+  const tasks = data?.pages.flatMap((page) => page) ?? [];
+
+  // ---------------------------------------------------------------------------
+  // Infinite scroll
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const firstEntry = entries[0];
+
+        if (firstEntry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      {
+        threshold: 0.5,
+      },
+    );
+
+    const current = loadMoreRef.current;
+
+    if (current) {
+      observer.observe(current);
+    }
+
+    return () => {
+      if (current) {
+        observer.unobserve(current);
+      }
+    };
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  // ---------------------------------------------------------------------------
+  // Mutation
+  // ---------------------------------------------------------------------------
 
   const mutation = useMutation({
     mutationFn: updateTask,
+
     onMutate: async (updatedTask) => {
       await queryClient.cancelQueries({
         queryKey: ["tasks"],
       });
 
-      const previousTasks = queryClient.getQueryData<Task[]>(["tasks"]);
+      const previousData = queryClient.getQueryData(["tasks"]);
 
-      queryClient.setQueryData<Task[]>(["tasks"], (old = []) =>
-        old.map((task) => {
-          if (task.id !== updatedTask.id) {
-            return task;
+      queryClient.setQueriesData(
+        {
+          queryKey: ["tasks"],
+        },
+        (oldData: any) => {
+          if (!oldData?.pages) {
+            return oldData;
           }
-          return updatedTask;
-        }),
+
+          return {
+            ...oldData,
+
+            pages: oldData.pages.map((page: Task[]) =>
+              page.map((task) => {
+                if (task.id !== updatedTask.id) {
+                  return task;
+                }
+
+                return updatedTask;
+              }),
+            ),
+          };
+        },
       );
 
-      return { previousTasks };
+      return {
+        previousData,
+      };
     },
 
     onError: (_error, _variables, context) => {
-      queryClient.setQueryData(["tasks"], context?.previousTasks);
+      queryClient.setQueryData(["tasks"], context?.previousData);
     },
   });
+
+  // ---------------------------------------------------------------------------
+  // Drag handlers
+  // ---------------------------------------------------------------------------
 
   function handleDragStart(event: DragStartEvent) {
     setActiveTaskId(event.active.id as string);
   }
-
-  // ---------------------------------------------------------------------------
-  // Functions
-  // ---------------------------------------------------------------------------
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -102,7 +185,7 @@ export function TaskBoard() {
 
     if (!over) return;
 
-    const activeTask = data.find((task) => task.id === active.id);
+    const activeTask = tasks.find((task) => task.id === active.id);
 
     if (!activeTask) return;
 
@@ -128,25 +211,71 @@ export function TaskBoard() {
     });
   }
 
-  const activeTask = data.find((task) => task.id === activeTaskId);
+  // ---------------------------------------------------------------------------
+  // Active task
+  // ---------------------------------------------------------------------------
+
+  const activeTask = tasks.find((task) => task.id === activeTaskId);
+
+  // ---------------------------------------------------------------------------
+  // Loading state
+  // ---------------------------------------------------------------------------
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-white">
-        Loading tasks...
-      </div>
+      <main className="min-h-screen bg-zinc-950 p-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8">
+            <div className="mb-2 h-8 w-52 animate-pulse rounded bg-zinc-800" />
+
+            <div className="h-4 w-72 animate-pulse rounded bg-zinc-800" />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {Array.from({
+              length: 4,
+            }).map((_, index) => (
+              <TaskColumnSkeleton key={index} />
+            ))}
+          </div>
+        </div>
+      </main>
     );
   }
 
   if (isError) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-red-500">
-        Failed to load tasks.
-      </div>
+      <main className="flex min-h-screen items-center justify-center bg-zinc-950 p-6 text-white">
+        <div className="w-full max-w-md rounded-2xl border border-red-500/20 bg-zinc-900 p-6 text-center">
+          <div className="mb-4 flex justify-center">
+            <div className="flex size-14 items-center justify-center rounded-full bg-red-500/10 text-2xl">
+              ⚠
+            </div>
+          </div>
+
+          <h2 className="mb-2 text-2xl font-bold">Failed to load tasks</h2>
+
+          <p className="mb-6 text-sm text-zinc-400">
+            {error instanceof Error
+              ? error.message
+              : "Something went wrong while fetching tasks."}
+          </p>
+
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-black transition hover:opacity-90"
+          >
+            Retry
+          </button>
+        </div>
+      </main>
     );
   }
 
   // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <main className="min-h-screen bg-zinc-950 p-6 text-white">
@@ -167,11 +296,34 @@ export function TaskBoard() {
             {columns.map((column) => (
               <TaskColumn
                 key={column.status}
-                tasks={data}
+                tasks={tasks}
                 title={column.title}
                 status={column.status}
               />
             ))}
+          </div>
+
+          {isFetchingNextPage && (
+            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {Array.from({
+                length: 4,
+              }).map((_, index) => (
+                <TaskColumnSkeleton key={index} />
+              ))}
+            </div>
+          )}
+
+          <div ref={loadMoreRef} className="flex justify-center py-10">
+            {isFetchingNextPage ? (
+              <div className="flex items-center gap-2 text-zinc-400">
+                <div className="size-5 animate-spin rounded-full border-2 border-zinc-700 border-t-white" />
+                Loading more tasks...
+              </div>
+            ) : hasNextPage ? (
+              <p className="text-zinc-500">Scroll to load more</p>
+            ) : (
+              <p className="text-zinc-500">No more tasks</p>
+            )}
           </div>
         </div>
       </main>
